@@ -1,17 +1,13 @@
-"""Mock database and memory store for Riverwood AI Voice Agent."""
-
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
 
-
-# ─── Mock User Database ────────────────────────────────────────────────────────
-
+# ──── Dummy DB for users 
 USERS_DB: Dict[str, Dict[str, Any]] = {
     "user_001": {
-        "name": "Rahul Sharma",
+        "name": "Akansha",
         "phone": "+919876543210",
         "language": "hi",
         "project": "Riverwood Estate - Tower A",
@@ -20,7 +16,7 @@ USERS_DB: Dict[str, Dict[str, Any]] = {
         "payment_status": "On Track",
     },
     "user_002": {
-        "name": "Priya Patel",
+        "name": "Khushi",
         "phone": "+919876543211",
         "language": "en",
         "project": "Riverwood Estate - Tower B",
@@ -29,7 +25,7 @@ USERS_DB: Dict[str, Dict[str, Any]] = {
         "payment_status": "On Track",
     },
     "user_003": {
-        "name": "Amit Verma",
+        "name": "Sakshi",
         "phone": "+919876543212",
         "language": "hi",
         "project": "Riverwood Estate - Tower A",
@@ -39,8 +35,7 @@ USERS_DB: Dict[str, Dict[str, Any]] = {
     },
 }
 
-
-# ─── Construction Updates ──────────────────────────────────────────────────────
+# ─── Construction Updates, dummy DB
 
 CONSTRUCTION_UPDATES: Dict[str, Dict[str, Any]] = {
     "Riverwood Estate - Tower A": {
@@ -65,17 +60,14 @@ CONSTRUCTION_UPDATES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-
-# ─── Runtime State (in-memory) ─────────────────────────────────────────────────
-
+# ─── Runtime State (in-memory) 
 VISIT_INTENTIONS: Dict[str, Dict[str, Any]] = {}
 CALL_HISTORY: Dict[str, List[Dict[str, Any]]] = {}
 ACTIVE_CALLS: Dict[str, str] = {}  # call_id -> user_id
 SCHEDULED_CALLBACKS: Dict[str, Dict[str, Any]] = {}
 USER_STATE: Dict[str, Dict[str, Any]] = {}
 
-
-# ─── Memory Store ──────────────────────────────────────────────────────────────
+# ─── Memory Store 
 
 class MemoryStore:
     """Manages application state and mock database operations."""
