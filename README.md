@@ -53,14 +53,14 @@ An AI-powered outbound voice agent for **Riverwood Projects LLP** that delivers 
 
 ## Tech Stack
 
-| Component | Technology | Purpose |
-| :--- | :--- | :--- |
-| **Backend / API** | Python, FastAPI | Webhook processing, state management, call orchestration |
-| **Voice Orchestration** | VAPI | Manages WebRTC, SIP, and real-time audio streaming |
-| **LLM Engine** | OpenAI GPT-4o | Conversational logic and context understanding |
-| **Voice Synthesis (TTS)** | ElevenLabs (via VAPI) | Ultra-realistic speech in English and Hindi |
-| **Speech-to-Text (STT)** | Deepgram (via VAPI) | Real-time speech transcription |
-| **Memory / Storage** | In-Memory Dict | User profiles, call history, visit intention records |
+| Component                 | Technology            | Purpose                                                  |
+| :------------------------ | :-------------------- | :------------------------------------------------------- |
+| **Backend / API**         | Python, FastAPI       | Webhook processing, state management, call orchestration |
+| **Voice Orchestration**   | VAPI                  | Manages WebRTC, SIP, and real-time audio streaming       |
+| **LLM Engine**            | OpenAI GPT-4o         | Conversational logic and context understanding           |
+| **Voice Synthesis (TTS)** | ElevenLabs (via VAPI) | Ultra-realistic speech in English and Hindi              |
+| **Speech-to-Text (STT)**  | Deepgram (via VAPI)   | Real-time speech transcription                           |
+| **Memory / Storage**      | In-Memory Dict        | User profiles, call history, visit intention records     |
 
 ---
 
@@ -129,29 +129,29 @@ curl -X POST http://localhost:8000/api/call \
 
 ### Example Conversation Flow
 
-1. **Aditya** (AI): *"Hello! Kya main Rahul Sharma ji se baat kar rahi hoon? Namaste! Main Aditya hoon, Riverwood Projects ki taraf se call kar rahi hoon. Aap kaise hain?"*
-2. **Customer**: *"Haan, Rahul bol raha hoon. Theek hoon."*
-3. **Aditya**: *"Bahut accha! Main aapko aapke 3BHK unit ka construction update dene ke liye call kar rahi hoon. Tower A mein abhi Phase 3 chal raha hai — interior finishing. 72% kaam complete ho chuka hai, aur flooring aur painting agle hafte se shuru ho rahi hai."*
-4. **Customer**: *"Wah, ye toh acchi khabar hai!"*
-5. **Aditya**: *"Ji bilkul! Kya aap is weekend site visit karna chahenge? Saturday-Sunday 10 se 5 baje tak visit available hai."*
-6. **Customer**: *"Haan, Saturday ko aa sakta hoon."*
-7. **Aditya** → *calls `record_site_visit` tool* → *"Bahut badhiya! Maine Saturday ke liye aapki visit note kar li hai. Humari site team aapka intezaar karegi. Dhanyavaad Rahul ji, aapka din shubh ho!"*
+1. **Akanksha** (AI): _"Hello! Kya main Rahul Sharma ji se baat kar rahi hoon? Namaste! Main Akanksha hoon, Riverwood Projects ki taraf se call kar rahi hoon. Aap kaise hain?"_
+2. **Customer**: _"Haan, Rahul bol raha hoon. Theek hoon."_
+3. **Akanksha**: _"Bahut accha! Main aapko aapke 3BHK unit ka construction update dene ke liye call kar rahi hoon. Tower A mein abhi Phase 3 chal raha hai — interior finishing. 72% kaam complete ho chuka hai, aur flooring aur painting agle hafte se shuru ho rahi hai."_
+4. **Customer**: _"Wah, ye toh acchi khabar hai!"_
+5. **Akanksha**: _"Ji bilkul! Kya aap is weekend site visit karna chahenge? Saturday-Sunday 10 se 5 baje tak visit available hai."_
+6. **Customer**: _"Haan, Saturday ko aa sakta hoon."_
+7. **Akanksha** → _calls `record_site_visit` tool_ → _"Bahut badhiya! Maine Saturday ke liye aapki visit note kar li hai. Humari site team aapka intezaar karegi. Dhanyavaad Rahul ji, aapka din shubh ho!"_
 
 ---
 
 ## API Reference
 
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/call` | Trigger a single outbound call |
-| `POST` | `/api/bulk-call` | Trigger batch outbound calls |
-| `POST` | `/api/webhook` | VAPI webhook handler (tool-calls, status, reports) |
-| `GET` | `/api/users` | List all customers |
-| `GET` | `/api/users/{id}` | Get customer details + call history |
-| `GET` | `/api/visits` | List all recorded visit intentions |
-| `GET` | `/api/call-history/{id}` | Get past call summaries for a user |
-| `GET` | `/api/callbacks` | List all scheduled callbacks |
-| `GET` | `/health` | Health check |
+| Method | Endpoint                 | Description                                        |
+| :----- | :----------------------- | :------------------------------------------------- |
+| `POST` | `/api/call`              | Trigger a single outbound call                     |
+| `POST` | `/api/bulk-call`         | Trigger batch outbound calls                       |
+| `POST` | `/api/webhook`           | VAPI webhook handler (tool-calls, status, reports) |
+| `GET`  | `/api/users`             | List all customers                                 |
+| `GET`  | `/api/users/{id}`        | Get customer details + call history                |
+| `GET`  | `/api/visits`            | List all recorded visit intentions                 |
+| `GET`  | `/api/call-history/{id}` | Get past call summaries for a user                 |
+| `GET`  | `/api/callbacks`         | List all scheduled callbacks                       |
+| `GET`  | `/health`                | Health check                                       |
 
 ---
 
@@ -187,15 +187,14 @@ curl -X POST http://localhost:8000/api/call \
 
 ### Estimated Cost per 1000 Calls
 
-| Item | Unit Cost | Quantity | Total |
-| :--- | :--- | :--- | :--- |
-| VAPI Platform | ~$0.05/min | 3 min avg × 1000 | **$150** |
-| OpenAI GPT-4o | ~$0.01/call | 1000 calls | **$10** |
-| ElevenLabs TTS | Included in VAPI | — | $0 |
-| Deepgram STT | Included in VAPI | — | $0 |
-| Twilio Telephony | ~$0.02/min | 3 min avg × 1000 | **$60** |
-| AWS Infra (ECS + SQS) | ~$0.01/call | 1000 calls | **$10** |
-| **Total** | | | **~$230/morning** |
+| Item                  | Unit Cost        | Quantity         | Total             |
+| :-------------------- | :--------------- | :--------------- | :---------------- |
+| VAPI Platform         | ~$0.05/min       | 3 min avg × 1000 | **$150**          |
+| OpenAI GPT-4o         | ~$0.01/call      | 1000 calls       | **$10**           |
+| ElevenLabs TTS        | Included in VAPI | —                | $0                |
+| Deepgram STT          | Included in VAPI | —                | $0                |
+| Twilio Telephony      | ~$0.02/min       | 3 min avg × 1000 | **$60**           |
+| AWS Infra (ECS + SQS) | ~$0.01/call      | 1000 calls       | **$10**           |
+| **Total**             |                  |                  | **~$230/morning** |
 
-*Costs are approximate. VAPI bundles STT/TTS in its per-minute rate. Actual costs depend on call duration and model usage.*
-
+_Costs are approximate. VAPI bundles STT/TTS in its per-minute rate. Actual costs depend on call duration and model usage._
