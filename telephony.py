@@ -10,12 +10,12 @@ def place_interactive_call(audio_filename: str, user_id: str):
     TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
     MY_PHONE_NUMBER = os.getenv("MY_PHONE_NUMBER")
     
-    # Check for NGROK_URL or fallback to BASE_URL
+    # Telephony configuration falls back to simulation via environment parameter
     NGROK_URL = os.getenv("NGROK_URL", os.getenv("BASE_URL")) 
     SIMULATE = os.getenv("SIMULATE_TELEPHONY", "true").lower() == "true"
 
     if SIMULATE or not TWILIO_ACCOUNT_SID:
-        print(f"Telephony simulated. Audio file ready: {audio_filename}")
+        print(f"Telephony simulated. Audio asset formatted: {audio_filename}")
         return "simulated_call_id", "simulated"
 
     client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -23,10 +23,10 @@ def place_interactive_call(audio_filename: str, user_id: str):
     base_filename = os.path.basename(audio_filename)
     audio_url = f"{NGROK_URL}/static/{base_filename}"
     
-    # The URL Twilio will hit with the transcribed user speech
+    # Process webhook configured for transcription events
     process_url = f"{NGROK_URL}/api/process?user_id={user_id}"
     
-    # TwiML logic: Gather speech, play the greeting, then POST to our API
+    # TwiML structure: Stream greeting, await speech input, dispatch POST
     twiml = f'''
 <Response>
     <Gather

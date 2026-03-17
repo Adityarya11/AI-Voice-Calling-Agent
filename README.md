@@ -1,200 +1,121 @@
 # Riverwood AI Voice Agent
 
-An AI-powered outbound voice agent for **Riverwood Projects LLP** that delivers construction progress updates to customers and captures site visit intentions — all via natural phone conversations in Hindi and English.
 
----
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    VAPI Orchestrator                    │
-│  (WebRTC · SIP · Deepgram STT · ElevenLabs TTS · LLM)   │
-└──────────┬──────────────────────────────────────┬───────┘
-           │  Outbound Call API                   │  Webhook Events
-           │  (POST /call)                        │  (tool-calls, status,  report)
-           ▼                                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              FastAPI Backend (Your Server)              │
-│                                                         │
-│  POST /api/call        → Trigger outbound call          │
-│  POST /api/bulk-call   → Trigger batch calls            │
-│  POST /api/webhook     → Handle VAPI events & tools     │
-│  GET  /api/users       → Customer database              │
-│  GET  /api/visits      → Visit intention records        │
-│  GET  /api/call-history→ Past call summaries            │
-└──────────┬──────────────────────────────────────────────┘
-           │
-           ▼
-┌──────────────────────┐
-│   Memory Store       │
-│  (In-Memory Dict)    │
-│  • User profiles     │
-│  • Construction data │
-│  • Visit intentions  │
-│  • Call history      │
-└──────────────────────┘
-```
+\\	ext
+[ Admin / Scheduler ]
+        | (POST /trigger/{user_id})
+        v
++---------------------------------------------------+
+|                   FastAPI Backend                 |
+|                                                   |
+|  1. Fetches User Context & Construction Update    |
+|  2. Evaluates Call History (Returning vs New)     |
+|  3. Dispatches initial outbound call via Twilio   |
++---------------------------------------------------+
+        |                                 ^
+        | (TwiML / REST)                  | (SpeechResult Webhook)
+        v                                 |
++---------------------------------------------------+
+|                  Twilio Voice API                 |
+|  (Handles PSTN connectivity, Gather, recording)   |
++---------------------------------------------------+
+        |
+        v
+[ Customer Phone ]
+\
+## Core Functionalities
 
-### How It Works
+### 1. Persistent Conversational Memory
+The agent utilizes an integrated SQLite + SQLAlchemy database to persist user state across multiple distinct phone calls. 
+- Database Models track User details, CRM flags (site_visit_interest), ConstructionUpdate records, and chronologically mapped Interaction chat histories.
+- Returning User Logic: If the system initiates a call to a returning user, it acknowledges previous context rather than repeating standard scripted greetings.
 
-1. **Call Trigger**: The backend sends a `POST /api/call` request. This calls VAPI's REST API with an inline assistant configuration — the customer's name, project details, and construction update are all injected into the system prompt dynamically.
+### 2. Immediate "Busy Customer" Fallback
+To handle real-world telephonic rejections efficiently without expending LLM tokens or incurring text-to-speech generation latency:
+- The system scans real-time transcriptions for rejection markers ("busy", "call later", "wrong number", "cut the call").
+- If detected, it entirely bypasses the LLM processing and immediately streams a pre-generated, zero-latency MP3 audio file.
+- An automatic <Hangup> signal is fired back to Twilio to cleanly end the call within milliseconds.
 
-2. **Voice Conversation**: VAPI handles the real-time audio pipeline:
-   - **STT** (Deepgram) transcribes the customer's speech.
-   - **LLM** (GPT-4o) generates contextual responses using the injected system prompt.
-   - **TTS** (ElevenLabs) converts text to natural, warm speech.
+### 3. Real-Time Intent Extraction & CRM Updating
+As the user speaks, the system concurrently analyzes the transcription for context intent:
+- If an agreement to a site visit is detected, the site_visit_interest boolean is permanently committed to the database.
+- A pre-cached confirmation message is dispatched with zero generation delay before gracefully terminating the call.
 
-3. **Tool Calling**: When the LLM determines the customer has answered the visit question, it triggers a function call. VAPI sends this as an HTTP POST to the FastAPI webhook, which records the data and returns confirmation to the LLM.
+### 4. Dynamic Knowledge Base Injection
+The LLM (Google Gemini 2.5 Flash) operates smoothly by dynamically reconstructing a highly optimized context window before every single interaction:
+- Injects the system prompt to enforce persona consistency.
+- Appends the latest construction phase, precise percentage completion, and available visiting hours.
+- Appends the last 10 interactions of historical conversation to maintain timeline continuity.
 
-4. **Memory / Context Retention**: After each call ends, VAPI sends an `end-of-call-report` with a transcript and summary. The backend stores this so future calls can reference previous interactions — enabling conversational continuity across calls.
+## System Call Flow
 
----
-
+\\	ext
+1. OUTBOUND TRIGGER
+   Backend -> Initiates Call via Twilio API -> Plays Greeting (gTTS)
+   
+2. USER SPEECH LOOP
+   Twilio <Gather> -> Captures User Speech -> Sends to /api/process Webhook
+   
+3. FASTAPI PROCESSING PIPELINE
+   |-- Check User Intent
+   |   |-- IF "Busy / Not Interested": Stream Canned Audio (0ms) -> HANGUP
+   |   |-- IF "Agrees to Visit": Update DB -> Stream Canned Audio (0ms) -> HANGUP
+   |   |
+   |-- IF Standard Conversation:
+       |-- Retrieve prior context limits from persistence layer
+       |-- Emit prompt payload to Gemini REST API
+       |-- Stream synthetic output through gTTS
+       |-- Return formatted TwiML <Play> payload
+       
+4. CONTINUATION
+   Twilio plays generated audio -> Loops back to <Gather> unless termination flagged.
+\
 ## Tech Stack
 
-| Component                 | Technology            | Purpose                                                  |
-| :------------------------ | :-------------------- | :------------------------------------------------------- |
-| **Backend / API**         | Python, FastAPI       | Webhook processing, state management, call orchestration |
-| **Voice Orchestration**   | VAPI                  | Manages WebRTC, SIP, and real-time audio streaming       |
-| **LLM Engine**            | OpenAI GPT-4o         | Conversational logic and context understanding           |
-| **Voice Synthesis (TTS)** | ElevenLabs (via VAPI) | Ultra-realistic speech in English and Hindi              |
-| **Speech-to-Text (STT)**  | Deepgram (via VAPI)   | Real-time speech transcription                           |
-| **Memory / Storage**      | In-Memory Dict        | User profiles, call history, visit intention records     |
-
----
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| Backend Framework | FastAPI (Python) | API routing, webhook processing, state management |
+| Telephony & STT | Twilio | PSTN network interface and Speech-to-Text inference |
+| LLM Engine | Google Gemini 2.5 Flash | Conversational generation (asynchronous HTTP integration) |
+| Text-to-Speech | gTTS (Google TTS) | Native low-overhead audio file output |
+| Database / Memory | SQLite + SQLAlchemy | Strict persistence for profiles, states, and history logs |
 
 ## Project Structure
 
-```
-riverwood-voice-agent/
-├── app/
-│   ├── __init__.py       # Package marker
-│   ├── main.py           # FastAPI app + webhook endpoints
-│   ├── models.py         # Pydantic models for VAPI payloads
-│   ├── memory.py         # Mock database + state management
-│   └── services.py       # VAPI REST API integration
-├── .env                  # Secret keys (VAPI, ngrok URL, etc.)
-├── .gitignore            # Standard Python gitignore
-├── requirements.txt      # Python dependencies
-└── README.md             # This file — architecture + technical note
-```
+\\	ext
+riverwood-ai-challenge/
+|-- agent.py             # Core prompt assembly, DB integration, and intent mapping
+|-- db.py                # Database configurations and declarative schema design
+|-- llm_gemma.py         # HTTPX integration adapter for Google Gemini API
+|-- main.py              # Primary application routines and webhook resolution
+|-- telephony.py         # Outbound pipeline integration
+|-- tts.py               # Text-to-Speech serialization and latent caching map
+|-- seed_db.py           # Populates environment base for demonstration mock-data
+|-- trigger_call.py      # Entry-point for test environment orchestration
+\-- requirements.txt     # Environment dependencies
+\
+## Execution Environment
 
----
-
-<!-- ## Setup & Run
-
-### Prerequisites
-
-- Python 3.10+
-- VAPI account with API key and a phone number
-- ngrok (for local development — exposes your localhost to VAPI)
-
-### Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-### Configuration
-
-Edit `.env` with your credentials:
-
-```env
-VAPI_API_KEY=your_vapi_api_key
-VAPI_PHONE_NUMBER_ID=your_phone_number_id
-SERVER_URL=https://xxxx.ngrok.io
-ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
-```
-
-### Run
-
-```bash
-# Terminal 1 — Start the FastAPI server
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Terminal 2 — Expose via ngrok
-ngrok http 8000
-```
-
-Copy the ngrok HTTPS URL and set it as `SERVER_URL` in `.env`.
-
-### Trigger a Call
-
-```bash
-curl -X POST http://localhost:8000/api/call \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": "user_001"}'
-``` -->
-
-### Example Conversation Flow
-
-1. **Akanksha** (AI): _"Hello! Kya main Rahul Sharma ji se baat kar rahi hoon? Namaste! Main Akanksha hoon, Riverwood Projects ki taraf se call kar rahi hoon. Aap kaise hain?"_
-2. **Customer**: _"Haan, Rahul bol raha hoon. Theek hoon."_
-3. **Akanksha**: _"Bahut accha! Main aapko aapke 3BHK unit ka construction update dene ke liye call kar rahi hoon. Tower A mein abhi Phase 3 chal raha hai — interior finishing. 72% kaam complete ho chuka hai, aur flooring aur painting agle hafte se shuru ho rahi hai."_
-4. **Customer**: _"Wah, ye toh acchi khabar hai!"_
-5. **Akanksha**: _"Ji bilkul! Kya aap is weekend site visit karna chahenge? Saturday-Sunday 10 se 5 baje tak visit available hai."_
-6. **Customer**: _"Haan, Saturday ko aa sakta hoon."_
-7. **Akanksha** → _calls `record_site_visit` tool_ → _"Bahut badhiya! Maine Saturday ke liye aapki visit note kar li hai. Humari site team aapka intezaar karegi. Dhanyavaad Rahul ji, aapka din shubh ho!"_
-
----
-
-## API Reference
-
-| Method | Endpoint                 | Description                                        |
-| :----- | :----------------------- | :------------------------------------------------- |
-| `POST` | `/api/call`              | Trigger a single outbound call                     |
-| `POST` | `/api/bulk-call`         | Trigger batch outbound calls                       |
-| `POST` | `/api/webhook`           | VAPI webhook handler (tool-calls, status, reports) |
-| `GET`  | `/api/users`             | List all customers                                 |
-| `GET`  | `/api/users/{id}`        | Get customer details + call history                |
-| `GET`  | `/api/visits`            | List all recorded visit intentions                 |
-| `GET`  | `/api/call-history/{id}` | Get past call summaries for a user                 |
-| `GET`  | `/api/callbacks`         | List all scheduled callbacks                       |
-| `GET`  | `/health`                | Health check                                       |
-
----
-
-## Scaling to 1000 Calls/Morning
-
-### Infrastructure Design
-
-```
-┌──────────┐    ┌──────────────┐    ┌────────────────┐    ┌──────────┐
-│  Cron /  │───▶│  Message     │───▶│  Worker Pool   │───▶│  VAPI    │
-│Scheduler │    │  Queue (SQS) │    │  (K8s / ECS)   │    │  API     │
-└──────────┘    └──────────────┘    └────────────────┘    └──────────┘
-                                           │
-                                    ┌──────┴──────┐
-                                    │ PostgreSQL  │
-                                    │ (Call State)│
-                                    └─────────────┘
-```
-
-1. **Scheduler** (AWS EventBridge / cron): Triggers the batch job at the configured time each morning.
-2. **Message Queue** (AWS SQS / RabbitMQ): Receives 1000 call tasks. Provides durability, retry logic, and backpressure.
-3. **Worker Pool** (Kubernetes / AWS ECS): 5–10 worker instances pull tasks from the queue and dispatch calls via VAPI. Auto-scales based on queue depth.
-4. **Rate Limiter**: Workers respect VAPI's API rate limits (typically 10–50 concurrent calls). A token bucket algorithm controls dispatch rate.
-5. **State Database** (PostgreSQL): Tracks call status (queued → in-progress → completed/failed), enables retries for failed calls, and stores outcomes.
-6. **Monitoring** (CloudWatch / Prometheus): Dashboards track call success rate, average latency, and error rates. Alerts fire on failure spikes.
-
-### Key Optimizations
-
-- **Staggered Dispatch**: Spread calls over a 1–2 hour window to avoid thundering herd.
-- **Concurrency Control**: Max 20–30 simultaneous calls balancing speed vs. quality.
-- **Smart Retries**: Failed calls re-queued with exponential backoff (max 3 attempts).
-- **Priority Queues**: High-value customers called first.
-
-### Estimated Cost per 1000 Calls
-
-| Item                  | Unit Cost        | Quantity         | Total             |
-| :-------------------- | :--------------- | :--------------- | :---------------- |
-| VAPI Platform         | ~$0.05/min       | 3 min avg × 1000 | **$150**          |
-| OpenAI GPT-4o         | ~$0.01/call      | 1000 calls       | **$10**           |
-| ElevenLabs TTS        | Included in VAPI | —                | $0                |
-| Deepgram STT          | Included in VAPI | —                | $0                |
-| Twilio Telephony      | ~$0.02/min       | 3 min avg × 1000 | **$60**           |
-| AWS Infra (ECS + SQS) | ~$0.01/call      | 1000 calls       | **$10**           |
-| **Total**             |                  |                  | **~$230/morning** |
-
-_Costs are approximate. VAPI bundles STT/TTS in its per-minute rate. Actual costs depend on call duration and model usage._
+1. Dependency Configuration:
+   \\ash
+   pip install -r requirements.txt
+   \2. Environment Declaration (.env):
+   \\	ext
+   TWILIO_ACCOUNT_SID=...
+   TWILIO_AUTH_TOKEN=...
+   TWILIO_PHONE_NUMBER=...
+   GEMINI_API_KEY=...
+   NGROK_URL=https://...
+   \3. Initialize the persistence schema:
+   \\ash
+   python seed_db.py
+   \4. Bind application processes:
+   \\ash
+   uvicorn main:app --port 8000
+   \5. Initiate demonstration script:
+   \\ash
+   python trigger_call.py
+   \
