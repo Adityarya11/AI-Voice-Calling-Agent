@@ -28,6 +28,7 @@ Thumbs.db
 
 # Logs
 *.log
+data/logs/
 
 # Old project reference files (not part of the app)
 faqs.json
@@ -35,4 +36,7 @@ llm_module.py
 rag_module.py
 utils.py
 
+.pytest_cache
+
 audio
+data/audio/
